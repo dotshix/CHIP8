@@ -12,13 +12,16 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    struct CHIP8State cpu;
+    initCHIP8(&cpu);
+
     // Open the ROM file
-    if(loadRom(argv[1])){
+    if(loadRom(&cpu, argv[1])){
         return 1;
     }
     setlocale(LC_ALL, "");
     srand(time(NULL)); // set a seed based on the current time
-    loadSprites();
+    loadSprites(&cpu);
     initScreen();
     /* for(int i = 0; i < SCREEN_COLS; i++){ */
     /*     for(int x = 0; x < SCREEN_ROWS; x++) */
@@ -27,7 +30,7 @@ int main(int argc, char **argv)
 
     /* printScreen(); */
 
-    cycle();
+    cycle(&cpu);
 
     getch();
     endwin();
