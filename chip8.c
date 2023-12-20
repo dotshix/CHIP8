@@ -27,6 +27,7 @@ void initCHIP8(struct CHIP8State *cpu){
     cpu->soundTimer = 0;
     cpu->paused = 0;
     cpu->cpuSpeed = 10;
+    cpu->screenNeedsRedraw = 1;
 }
 
 // Load sprites into memory
@@ -96,18 +97,34 @@ void interpret_instruction(struct CHIP8State *cpu){
 // TODO: needs a lot of work
 void cycle(struct CHIP8State *cpu){
     while(1){
-        for(int i = 0; i < cpu->cpuSpeed; i++){
-        if(!cpu->paused)
-            interpret_instruction(cpu);
+        unsigned long start_time = getMicrosecondTimestamp();
 
-    }
+        for(int i = 0; i < cpu->cpuSpeed; i++){
+            if(!cpu->paused)
+                interpret_instruction(cpu);
+        }
         if(!cpu->paused)
             updateTimer(cpu);
 
-        printScreen();
+        // Only call printScreen if the screen needs redrawing
+        if(cpu->screenNeedsRedraw) {
+            printScreen();
+            cpu->screenNeedsRedraw = 0;  // Reset the flag after drawing
+        }
+
+        // Introduce a delay to control the frame rate
+        unsigned long elapsed = getMicrosecondTimestamp() - start_time;
+        if (elapsed < FRAME_TIME_USEC) {
+            usleep(FRAME_TIME_USEC - elapsed);
+        }
     }
 }
 
+unsigned long getMicrosecondTimestamp() {
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return tv.tv_sec * 1000000 + tv.tv_usec;
+}
 
 void updateTimer(struct CHIP8State *cpu){
     if(cpu->delayTimer > 0)
@@ -422,7 +439,7 @@ void op_Dxyn(struct CHIP8State *cpu, uint16_t op){
 
         for(int col = 0; col < width; col++){
             if((pixel & 0x080) > 0){
-                if(setPixel(cpu->V[x] + col, cpu->V[y] + row)){
+                if(setPixel(cpu, cpu->V[x] + col, cpu->V[y] + row)){
                     cpu->V[0xF] = 1;
                 }
             }

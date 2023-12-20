@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/time.h>
+#include <unistd.h>
 
 #define CHIP8_H_
 
@@ -11,6 +13,8 @@
 #define REGISTER_SIZE 16
 #define STACK_SIZE 16
 #define ROM_START_ADDRESS 0x200
+#define FRAME_RATE 60
+#define FRAME_TIME_USEC (1000000 / FRAME_RATE)
 
 struct CHIP8State {
     // Used to store memory
@@ -41,6 +45,8 @@ struct CHIP8State {
     uint16_t paused;
 
     uint16_t cpuSpeed;
+
+   int8_t screenNeedsRedraw;
 };
 
 typedef void (*Chip8OpCode)(struct CHIP8State *, uint16_t);
@@ -100,4 +106,6 @@ uint8_t wrapping_add(uint8_t a, uint8_t b);
 void opfunc_00(struct CHIP8State *cpu, uint16_t op);
 void opfunc_8(struct CHIP8State *cpu, uint16_t op);
 void cpu_NULL(struct CHIP8State *cpu, uint16_t op);
+unsigned long getMicrosecondTimestamp();
+
 #endif // CHIP8_H_

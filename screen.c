@@ -3,6 +3,7 @@
 #include "screen.h"
 
 int display[SCREEN_ROWS * SCREEN_COLS];
+int changed[SCREEN_ROWS * SCREEN_COLS];
 
 // Init Screen Function
 void initScreen(){
@@ -10,53 +11,60 @@ void initScreen(){
     // Set all pixels to "off"
     for(int i = 0; i < SCREEN_ROWS * SCREEN_COLS; i++){
         display[i] = 0;
+        changed[i] = 1;
     }
 
     //init ncurses screen
     initscr();
+    cbreak();
+    noecho();
+    curs_set(0);
 }
 
 // Goes through our display and prints if pixel is set
-void printScreen(){
-    for(int x = 0; x < SCREEN_COLS; x++){
-        for(int y = 0; y < SCREEN_ROWS; y++){
-            if(display[x + (y * SCREEN_COLS)] == 1){
-                /* mvprintw(y, x, "x"); */
-                mvaddch(y, x, ACS_BOARD);
-
+void printScreen() {
+    for(int y = 0; y < SCREEN_ROWS; y++) {
+        for(int x = 0; x < SCREEN_COLS; x++) {
+            int index = x + (y * SCREEN_COLS);
+            if (changed[index]) {
+                move(y, x);
+                if(display[index] == 1){
+                    addch(ACS_BOARD);
+                } else {
+                    addch(' ');
+                }
+                changed[index] = 0;
             }
         }
     }
-
     refresh();
-    usleep(1000);
 }
 
 // Clears the Screen
-void clearScreen(){
-    // Set all pixels to "off"
-    for(int i = 0; i < SCREEN_ROWS * SCREEN_COLS; i++){
+void clearScreen() {
+    for (int i = 0; i < SCREEN_ROWS * SCREEN_COLS; i++) {
         display[i] = 0;
+        changed[i] = 1;
     }
-
-    initscr();
+    clear();
+    refresh();
 }
+
 
 // Functiont to set pixel on display
 // returns true if pixel is turned on
-int setPixel(int x, int y){
-    // If needed, wrap around
-    if(x > SCREEN_COLS)
-        x -= SCREEN_COLS;
-    else if(x < 0)
-        x += SCREEN_COLS;
+int setPixel(struct CHIP8State *cpu, int x, int y){
 
-    if(y > SCREEN_ROWS)
-        y -= SCREEN_ROWS;
-    else if(y < 0)
-        y += SCREEN_ROWS;
+    if (x >= SCREEN_COLS) x -= SCREEN_COLS;
+    else if (x < 0) x += SCREEN_COLS;
 
-   display[x + (y * SCREEN_COLS)] ^= 1;
+    if (y >= SCREEN_ROWS) y -= SCREEN_ROWS;
+    else if (y < 0) y += SCREEN_ROWS;
 
-   return display[x + (y * SCREEN_COLS)] != 1;
+    int index = x + (y * SCREEN_COLS);
+    display[index] ^= 1;
+    changed[index] = 1;
+    cpu->screenNeedsRedraw = 1;
+
+    return display[index] != 1;
 }
