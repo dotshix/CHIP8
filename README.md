@@ -13,7 +13,7 @@ This is a Chip8 emulator written in C that runs in the terminal using the ncurse
 
 This project is still under development, and there are several improvements and fixes that can be made:
 
-1. **Optimize CPU Usage:** Currently, the emulator might have high CPU usage. Consider implementing a timing mechanism to limit the emulation speed to the original Chip8 clock rate.
+~~1. **Optimize CPU Usage:** Currently, the emulator might have high CPU usage. Consider implementing a timing mechanism to limit the emulation speed to the original Chip8 clock rate.~~
 
 2. **Keyboard Support:** Add support for keyboard input to fully interact with Chip8 games.
 
