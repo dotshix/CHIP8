@@ -1,11 +1,12 @@
 #include "chip8.h"
 #include "screen.h"
+#include <stdbool.h>
 
 // TODO: ADD REMAINING INSTRUCTIONS
 Chip8OpCode instructions_array[16] =  { opfunc_00, op_1nnn, op_2nnn, op_3xkk,
                                         op_4xkk, op_5xy0, op_6xkk, op_7xkk,
                                         opfunc_8, op_9xy0, op_Annn, op_Bnnn,
-                                        op_Cxkk, op_Dxyn, cpu_NULL, cpu_NULL,
+                                        op_Cxkk, op_Dxyn, cpu_NULL, opfunc_F,
                                        };
 
 Chip8OpCode oparr_00[2] = { op_00E0, op_00EE };
@@ -14,6 +15,11 @@ Chip8OpCode op_arr8[9] = { op_8xy0, op_8xy1, op_8xy2,
                            op_8xy3, op_8xy4, op_8xy5,
                            op_8xy6, op_8xy7, op_8xyE,
                          };
+Chip8OpCode op_arrF[10] = { op_Fx07, cpu_NULL, op_Fx15,
+                            op_Fx18, op_Fx1E, op_Fx29,
+                            op_Fx33, op_Fx55, op_Fx65,
+                            cpu_NULL // Placeholder for additional opcodes if needed
+                          };
 
 void initCHIP8(struct CHIP8State *cpu){
     // Initialize CPU state, e.g., setting everything to zero
@@ -94,17 +100,27 @@ void interpret_instruction(struct CHIP8State *cpu){
 
 
 // TODO: needs a lot of work
-void cycle(struct CHIP8State *cpu){
-    while(1){
-        for(int i = 0; i < cpu->cpuSpeed; i++){
-        if(!cpu->paused)
-            interpret_instruction(cpu);
+#include <unistd.h>  // For usleep
 
-    }
-        if(!cpu->paused)
+void cycle(struct CHIP8State *cpu) {
+    while (1) {
+        // Handle events (e.g., user input)
+        // You may need a separate function to handle events
+
+        for (int i = 0; i < cpu->cpuSpeed; i++) {
+            if (!cpu->paused) {
+                interpret_instruction(cpu);
+            }
+        }
+
+        if (!cpu->paused) {
             updateTimer(cpu);
+        }
 
         printScreen();
+
+        // Sleep to regulate CPU speed (adjust as needed for desired speed)
+        usleep(1000); // Sleep for 1 millisecond
     }
 }
 
@@ -117,9 +133,6 @@ void updateTimer(struct CHIP8State *cpu){
         cpu->soundTimer -= 1;
 }
 
-uint8_t wrapping_add(uint8_t a, uint8_t b) {
-    return a + b;
-}
 // TODO: ADD NOTHING 0000 - NOP
 
 // CLS - Clear Display
@@ -215,7 +228,7 @@ void op_7xkk(struct CHIP8State *cpu, uint16_t op){
     uint8_t x = (op & 0x0F00) >> 8;
     uint8_t kk = (op & 0x00FF);
 
-    cpu->V[x] = wrapping_add(cpu->V[x], kk);
+    cpu->V[x] = cpu->V[x] + kk;
 }
 
 /*
@@ -269,18 +282,18 @@ void op_8xy3(struct CHIP8State *cpu, uint16_t op){
  * If the result is greater than 8 bits (i.e., > 255,) VF is set to 1, otherwise 0.
  * Only the lowest 8 bits of the result are kept, and stored in Vx.
  */
-void op_8xy4(struct CHIP8State *cpu, uint16_t op){
+void op_8xy4(struct CHIP8State *cpu, uint16_t op) {
     uint8_t x = (op & 0x0F00) >> 8;
     uint8_t y = (op & 0x00F0) >> 4;
+    uint8_t result;
+    bool carry;
 
-    // Perform addition with overflow check
-    uint16_t result = cpu->V[x] + cpu->V[y];
+    // Perform safe addition using GCC built-in function
+    carry = __builtin_add_overflow(cpu->V[x], cpu->V[y], &result);
+    uint8_t new_vf = carry ? 1 : 0;
 
-    // Check for overflow and update the carry flag (VF)
-    cpu->V[0xF] = (result > 0xFF) ? 1 : 0;
-
-    // Store the lowest 8 bits of the result in Vx
-    cpu->V[x] = result & 0xFF;
+    cpu->V[x] = result;
+    cpu->V[0xF] = new_vf;
 }
 
 /*
@@ -288,17 +301,18 @@ void op_8xy4(struct CHIP8State *cpu, uint16_t op){
  * If Vx > Vy, then VF is set to 1, otherwise 0.
  * Then Vy is subtracted from Vx, and the results stored in Vx.
  */
-void op_8xy5(struct CHIP8State *cpu, uint16_t op){
+void op_8xy5(struct CHIP8State *cpu, uint16_t op) {
     uint8_t x = (op & 0x0F00) >> 8;
     uint8_t y = (op & 0x00F0) >> 4;
+    uint8_t result;
+    bool borrow;
 
-    if(cpu->V[x] > cpu->V[y]){
-        cpu->V[0xF] = 1;
-    } else{
-        cpu->V[0xF] = 0;
-    }
+    // Perform safe subtraction using GCC built-in function
+    borrow = __builtin_sub_overflow(cpu->V[x], cpu->V[y], &result);
+    uint8_t new_vf = borrow ? 0 : 1;
 
-    cpu->V[x] = cpu->V[x] -  cpu->V[y];
+    cpu->V[x] = result;
+    cpu->V[0xF] = new_vf;
 }
 
 /*
@@ -306,16 +320,12 @@ void op_8xy5(struct CHIP8State *cpu, uint16_t op){
  * If the least-significant bit of Vx is 1, then VF is set to 1, otherwise 0.
  * Then Vx is divided by 2.
  */
-void op_8xy6(struct CHIP8State *cpu, uint16_t op){
+void op_8xy6(struct CHIP8State *cpu, uint16_t op) {
     uint8_t x = (op & 0x0F00) >> 8;
-    uint8_t lsb = cpu->V[x] & 1;
-    if( lsb == 1 ) {
-        cpu->V[0xF] = 1;
-    } else {
-        cpu->V[0xF] = 0;
-    }
+    uint8_t lsb = cpu->V[x] & 1;  // Extract the least significant bit of Vx
 
-    cpu->V[x] >>= 1;
+    cpu->V[x] >>= 1;              // Right shift Vx by 1
+    cpu->V[0xF] = lsb;            // Set VF to the LSB of Vx
 }
 
 /*
@@ -323,17 +333,18 @@ void op_8xy6(struct CHIP8State *cpu, uint16_t op){
  * If Vy > Vx, then VF is set to 1, otherwise 0.
  * Then Vx is subtracted from Vy, and the results stored in Vx.
  */
-void op_8xy7(struct CHIP8State *cpu, uint16_t op){
+void op_8xy7(struct CHIP8State *cpu, uint16_t op) {
     uint8_t x = (op & 0x0F00) >> 8;
     uint8_t y = (op & 0x00F0) >> 4;
+    uint8_t result;
+    bool borrow;
 
-    if(cpu->V[y] > cpu->V[x]){
-        cpu->V[0xF] = 1;
-    } else{
-        cpu->V[0xF] = 0;
-    }
+    // Perform safe subtraction using GCC built-in function
+    borrow = __builtin_sub_overflow(cpu->V[y], cpu->V[x], &result);
+    uint8_t new_vf = borrow ? 0 : 1;
 
-    cpu->V[x] = cpu->V[y] - cpu->V[x];
+    cpu->V[x] = result;
+    cpu->V[0xF] = new_vf;
 }
 
 /*
@@ -406,8 +417,7 @@ void op_Cxkk(struct CHIP8State *cpu, uint16_t op){
  * Sprites are XORed onto the existing screen. If this causes any pixels to be erased, VF is set to 1, otherwise it is set to 0.
  * If the sprite is positioned so part of it is outside the coordinates of the display, it wraps around to the opposite side of the screen.
  */
-void op_Dxyn(struct CHIP8State *cpu, uint16_t op){
-   // TODO: this is probably wrong, needs to be fixed
+void op_Dxyn(struct CHIP8State *cpu, uint16_t op) {
     uint8_t x = (op & 0x0F00) >> 8;
     uint8_t y = (op & 0x00F0) >> 4;
 
@@ -415,14 +425,14 @@ void op_Dxyn(struct CHIP8State *cpu, uint16_t op){
     int width = 8;
     int pixel;
 
-    cpu->V[0xF] = 1;
+    cpu->V[0xF] = 0;
 
-    for(int row = 0; row < height; row++){
+    for (int row = 0; row < height; row++) {
         pixel = cpu->memory[cpu->I + row];
 
-        for(int col = 0; col < width; col++){
-            if((pixel & 0x080) > 0){
-                if(setPixel(cpu->V[x] + col, cpu->V[y] + row)){
+        for (int col = 0; col < width; col++) {
+            if ((pixel & 0x80) != 0) {  // start with 0x80 and shift left
+                if (setPixel(cpu->V[x] + col, cpu->V[y] + row)) {
                     cpu->V[0xF] = 1;
                 }
             }
@@ -434,6 +444,7 @@ void op_Dxyn(struct CHIP8State *cpu, uint16_t op){
 /* TODO NEED TO IMPLEMENT OP CODE
  * NEED TO IMPLEMENT KEYBOARD FOR THESE
  * Ex9E, ExA1, */
+
 
 
 /*
@@ -545,4 +556,40 @@ void opfunc_8(struct CHIP8State *cpu, uint16_t op){
         op_arr8[8](cpu, op);
 }
 
+}
+
+void opfunc_F(struct CHIP8State *cpu, uint16_t op) {
+    uint8_t subcode = (op & 0x00FF);
+    switch (subcode) {
+        case 0x07:
+            op_Fx07(cpu, op);
+            break;
+        case 0x0A:
+            cpu_NULL(cpu, op);
+            break;
+        case 0x15:
+            op_Fx15(cpu, op);
+            break;
+        case 0x18:
+            op_Fx18(cpu, op);
+            break;
+        case 0x1E:
+            op_Fx1E(cpu, op);
+            break;
+        case 0x29:
+            op_Fx29(cpu, op);
+            break;
+        case 0x33:
+            op_Fx33(cpu, op);
+            break;
+        case 0x55:
+            op_Fx55(cpu, op);
+            break;
+        case 0x65:
+            op_Fx65(cpu, op);
+            break;
+        default:
+            cpu_NULL(cpu, op);
+            break;
+    }
 }

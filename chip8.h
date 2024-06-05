@@ -95,9 +95,9 @@ int loadRom(struct CHIP8State *cpu, const char *filename);// load  rom into memo
 void interpret_instruction(struct CHIP8State *cpu);
 void cycle(struct CHIP8State *cpu);
 void updateTimer(struct CHIP8State *cpu);
-uint8_t wrapping_add(uint8_t a, uint8_t b);
 
 void opfunc_00(struct CHIP8State *cpu, uint16_t op);
 void opfunc_8(struct CHIP8State *cpu, uint16_t op);
+void opfunc_F(struct CHIP8State *cpu, uint16_t op);
 void cpu_NULL(struct CHIP8State *cpu, uint16_t op);
 #endif // CHIP8_H_

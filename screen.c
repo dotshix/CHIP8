@@ -42,21 +42,19 @@ void clearScreen(){
     initscr();
 }
 
-// Functiont to set pixel on display
-// returns true if pixel is turned on
-int setPixel(int x, int y){
+// Function to set pixel on display
+// returns true if a collision occurs (i.e., if the pixel was already on)
+int setPixel(int x, int y) {
     // If needed, wrap around
-    if(x > SCREEN_COLS)
-        x -= SCREEN_COLS;
-    else if(x < 0)
-        x += SCREEN_COLS;
+    if (x >= SCREEN_COLS) x -= SCREEN_COLS;
+    else if (x < 0) x += SCREEN_COLS;
 
-    if(y > SCREEN_ROWS)
-        y -= SCREEN_ROWS;
-    else if(y < 0)
-        y += SCREEN_ROWS;
+    if (y >= SCREEN_ROWS) y -= SCREEN_ROWS;
+    else if (y < 0) y += SCREEN_ROWS;
 
-   display[x + (y * SCREEN_COLS)] ^= 1;
+    int index = x + (y * SCREEN_COLS);
+    int collision = display[index] == 1;
+    display[index] ^= 1;
 
-   return display[x + (y * SCREEN_COLS)] != 1;
+    return collision;
 }
